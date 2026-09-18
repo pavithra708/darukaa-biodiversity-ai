@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Darukaa Biodiversity Intelligence</title>
+  <style>
+    :root {
+      --bg: #0f1f17;
+      --panel: #163226;
+      --ink: #e8f2ea;
+      --muted: #9bb5a4;
+      --accent: #3d9b6a;
+      --accent-2: #c4a35a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Georgia, serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #1d4a33 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #2a4030 0%, transparent 50%),
+        var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      max-width: 40rem;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+    }
+    @media (min-width: 800px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    textarea, input, select {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid #2d5240;
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      font: inherit;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 1.25rem; }
+    button {
+      background: var(--accent);
+      color: #04150c;
+      border: 0;
+      border-radius: 999px;
+      padding: 0.7rem 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--accent-2);
+      border: 1px solid var(--accent-2);
+    }
+    #out {
+      background: rgba(12, 28, 20, 0.85);
+      border: 1px solid #2d5240;
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+      white-space: pre-wrap;
+      line-height: 1.45;
+      min-height: 220px;
+    }
+    .meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Darukaa.Earth</h1>
+    <p class="sub">
+      AI Biodiversity Intelligence — RAG-grounded, multi-metric ecological reasoning.
+      Prefer structured site data for strongest recommendations.
+    </p>
+
+    <div class="grid">
+      <div>
+        <label for="msg">Text query</label>
+        <textarea id="msg" placeholder="Biodiversity is declining on my land"></textarea>
+      </div>
+      <div>
+        <label for="json">Structured site JSON (optional)</label>
+        <textarea id="json">{
+  "soil_organic_carbon_pct": 0.3,
+  "rainfall": "low",
+  "land_use": "monoculture",
+  "crop": "wheat",
+  "region": "semi-arid"
+}</textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="send">Analyze</button>
+      <button class="secondary" id="example">Load example</button>
+      <button class="secondary" id="clarify">Ask clarifying demo</button>
+    </div>
+
+    <div id="out">Response will appear here.</div>
+    <div class="meta" id="meta"></div>
+  </main>
+  <script>
+    let sessionId = null;
+    const out = document.getElementById("out");
+    const meta = document.getElementById("meta");
+
+    document.getElementById("example").onclick = () => {
+      document.getElementById("msg").value = "Analyze this semi-arid wheat monoculture for biodiversity recovery.";
+      document.getElementById("json").value = `{
+  "soil_organic_carbon_pct": 0.3,
+  "rainfall": "low",
+  "land_use": "monoculture",
+  "crop": "wheat",
+  "region": "semi-arid"
+}`;
+    };
+
+    document.getElementById("clarify").onclick = () => {
+      document.getElementById("json").value = "";
+      document.getElementById("msg").value = "Biodiversity is declining on my land";
+    };
+
+    document.getElementById("send").onclick = async () => {
+      const message = document.getElementById("msg").value.trim();
+      const raw = document.getElementById("json").value.trim();
+      let site = null;
+      if (raw) {
+        try { site = JSON.parse(raw); }
+        catch (e) { out.textContent = "Invalid JSON in structured input."; return; }
+      }
+      out.textContent = "Thinking with knowledge retrieval...";
+      const payload = { message: message || null, site, session_id: sessionId };
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        out.textContent = data.detail || "Request failed";
+        return;
+      }
+      sessionId = data.session_id;
+      out.textContent = data.answer;
+      meta.textContent = `session=${sessionId} · recommendations=${data.recommendations.length} · RAG hits=${data.retrieved_knowledge.length} · needs_more_info=${data.needs_more_info}`;
+    };
+  </script>
+</body>
+</html>
